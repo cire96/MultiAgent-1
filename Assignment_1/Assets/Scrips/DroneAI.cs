@@ -17,12 +17,12 @@ public class DroneAI : MonoBehaviour
     public GameObject terrain_manager_game_object;
     TerrainManager terrain_manager;
     Graph DroneGraph;
-    float edgeLength;
+    //All edges have same length:
+    float edgeLength=3.0f;
 
     private void Start()
     {
-        //All edges have same length:
-        edgeLength=3.0f
+
         // get the drone controller
         m_Drone = GetComponent<DroneController>();
         droneCollider = GetComponent<SphereCollider>();
@@ -109,7 +109,7 @@ public class DroneAI : MonoBehaviour
 
     bool IsCollidingOnEdge(Vector3 from, Vector3 to)
     {
-        RaycastHit hit = Physics.Raycast(from, to - from, stepSize);
+        bool hit = Physics.Raycast(from, to - from, edgeLength);
         if (hit){return true;}
         return false;
     }
@@ -147,27 +147,31 @@ public class DroneAI : MonoBehaviour
 
         private int id;
         private double speedX, speedZ, AccellerationX, AccellerationZ, theta;
-        private double x, z;
+        private Vector3 position;
+        private float x, z;
 
 
-
- 
-        public double getPositionX()
-        {
-            return x;
+        public Vector3 getPosition(){
+            return position;
         }
-        public double getPositionZ()
+ 
+        public float getPositionX()
         {
-            return z;
+            return position.x;
+        }
+        public float getPositionZ()
+        {
+            return position.z;
         }
         public int getId()
         {
             return id;
         }
-        public Node(double _x, double _z)
+        public Node(float _x, float _z)
         {
             x = _x;
             z = _z;
+            position = new Vector3(_x,0,_z);
             id = -1;
         }
         public Node()
@@ -180,13 +184,15 @@ public class DroneAI : MonoBehaviour
         {
             id = _id;
         }
-        public void setPositionX(double _x)
+        public void setPositionX(float _x)
         {
             x = _x;
+            position.x=_x;
         }
-        public void setPositionZ(double _z)
+        public void setPositionZ(float _z)
         {
             z = _z;
+            position.z=_z;
         }
         public void setTheta(double _theta)
         {
@@ -263,7 +269,7 @@ public class DroneAI : MonoBehaviour
             double b_z = _B.getPositionX() - _C.getPositionZ();
             double num = a_x * b_x + a_z * b_z;
             double den = Math.Sqrt(a_x * a_x + a_z * a_z) * Math.Sqrt(b_x * b_x + b_z * b_z);
-            double angle = Math.Acos(num / (den + 0.000001));
+            double angle = Math.Acos(num / (den + 0.000001f));
             return angle;
         }
         public void setPathTheta(List<int> _path)
@@ -297,18 +303,19 @@ public class DroneAI : MonoBehaviour
 
             Node temp;
             Node closest = nodes[1];//root
-            float closestDistance = Vector3.Distance(x.position,target);
+            float closestDistance = Vector3.Distance(closest.getPosition(),target);
             float checkDistance = 0f;
-            foreach(Node node in nodes){
+            foreach(KeyValuePair<int, Node> node in nodes){
                 temp=node.Value;
-                checkDistance = Vector3.Distance(temp.position,target);
+                checkDistance = Vector3.Distance(temp.getPosition(),target);
                 if (checkDistance < closestDistance)
                     {
                         closestDistance = checkDistance;
                         closest = temp;
                     }
             }
-            return closest
+            return closest;
+        }
 
 
     }

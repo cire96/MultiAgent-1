@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -16,12 +17,18 @@ public class DroneAI : MonoBehaviour
 
     public GameObject terrain_manager_game_object;
     TerrainManager terrain_manager;
-    Graph DroneGraph;
+    private Graph DroneGraph;
     //All edges have same length:
-    float edgeLength = 3.0f;
-    float edgeMaxLength = 3.0f + 1.0f;
+    public float edgeLength = 5.0f;
+    public float edgeMinDist = 0.1f;
+    public float addEdgeMaxLength =  2.5f;
+
+    int randomTimer = 0;
+    Vector3 goal_pos;
     private void Start()
     {
+        int n = 500;
+        Debug.Log("Starting");
 
         // get the drone controller
         m_Drone = GetComponent<DroneController>();
@@ -33,27 +40,39 @@ public class DroneAI : MonoBehaviour
 
 
         Vector3 start_pos = terrain_manager.myInfo.start_pos;
-        Vector3 goal_pos = terrain_manager.myInfo.goal_pos;
+        goal_pos = terrain_manager.myInfo.goal_pos;
 
-        Node StartNode = new Node(start_pos.x, start_pos.z);
+        Node StartNode = new Node(new Vector3(start_pos.x, 1, start_pos.z));
+        Debug.Log("Creating the graph");
 
-        DroneGraph = new Graph(StartNode);
+        DroneGraph = new Graph();
+        DroneGraph.addNode(StartNode);
 
         //List<Vector3> my_path = new List<Vector3>();
 
 
         // Plan your path here
         // ...
-        RRG(1000, DroneGraph);
         
-        for (int i=0; i< 50; i++){
+        RRG(n, DroneGraph);
+        
+        for (int i=0; i< DroneGraph.getSize(); i++){
                 GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 Vector3 position = DroneGraph.getNode(i).getPosition();
-                
-                cube.transform.position = new Vector3(position.x, 1, position.z);
+            //Debug.Log("Node n." + i.ToString());
+            //foreach (object o in DroneGraph.getAdjList(i))
+            //{
+             //   Debug.Log(o);
+            //}
+            cube.transform.position = new Vector3(position.x, 1, position.z);
                 cube.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
-
-            Debug.Log(position);
+                for (int j = 0; j < DroneGraph.getAdjList(i).Count(); j++){
+                    Debug.DrawLine(DroneGraph.getNode(i).getPosition(), DroneGraph.getNode(DroneGraph.getAdjList(i)[j]).getPosition(), Color.blue, 100f);
+                    //Debug.Log(DroneGraph.getNode(i).getPosition() +" - "+ DroneGraph.getNode(j).getPosition());
+            }
+            
+            
+            //Debug.Log(position);
                 
         }
         //my_path.Add(start_pos);
@@ -130,8 +149,12 @@ public class DroneAI : MonoBehaviour
 
     bool IsCollidingOnEdge(Vector3 from, Vector3 to)
     {
-        bool hit = Physics.Raycast(from, to - from, edgeLength);
-        if (hit) { return true; }
+        from.y = 3;
+        to.y = 3;
+        
+        bool hit = Physics.Raycast(from, to - from, Vector3.Distance(from,to));
+        if (hit) { 
+            return true; }
         return false;
     }
 
@@ -139,9 +162,15 @@ public class DroneAI : MonoBehaviour
     Vector3 Pseudo_random(float radiusMargin)
     {
 
+        if (randomTimer == 10)
+        {
+            randomTimer = 0;
+            return goal_pos;
+        }
+        randomTimer++;
         float cordx = 50.0f; float cordz = 50.0f;
         bool foundNonColidingPos = false;
-        float[,] radiusHelpMatrix = new float[,] { { radiusMargin, 0.0f }, { -radiusMargin, 0.0f }, { 0.0f, radiusMargin }, { 0.0f, -radiusMargin } };
+        float[,] radiusHelpMatrix = new float[,] { { radiusMargin, radiusMargin }, { radiusMargin, -radiusMargin }, { -radiusMargin, radiusMargin}, { -radiusMargin, -radiusMargin }, { radiusMargin, 0.0f }, { -radiusMargin, 0.0f }, { 0.0f, radiusMargin }, { 0.0f, -radiusMargin } };
         while (foundNonColidingPos == false)
         {
             cordx = UnityEngine.Random.Range(terrain_manager.myInfo.x_low, terrain_manager.myInfo.x_high);
@@ -238,31 +267,36 @@ public class DroneAI : MonoBehaviour
 
     public class Graph
     {
-        Dictionary<int, Node> nodes = new Dictionary<int, Node>();
-        Dictionary<int, List<int>> adjList = new Dictionary<int, List<int>>();
-        List<int> endNodes = new List<int>();
+        Dictionary<int, Node> nodes;
+        Dictionary<int, List<int>> adjList;
+        List<int> endNodes;
 
         int size;
 
-        public Graph() { }
+        public Graph() {
+            Debug.Log("I am in the constructor");
+        nodes =  new Dictionary<int, Node>();
+        adjList =  new Dictionary<int, List<int>>();
+        endNodes = new List<int>();
+        size = 0;
+        }
 
         // The following constructor has parameters for two of the three 
         // properties. 
-        public Graph(Node _StartNode)
-        {
-            size = 0;
-            int id = size++;
-            nodes.Add(id, _StartNode);
-            adjList.Add(id, new List<int>());
-        }
+
 
         public Dictionary<int, Node> getNodes()
         {
             return nodes;
         }
+        public int getSize()
+        {
+            return size;
+        }
         public int addNode(Node _newNode)
         {
             int id = size++;
+            _newNode.setId(id);
             nodes.Add(id, _newNode);
             adjList.Add(id, new List<int>());
             return id;
@@ -284,7 +318,7 @@ public class DroneAI : MonoBehaviour
         }
         public void setAdjList(int _id, List<int> _adjList)
         {
-            adjList.Add(_id, _adjList);
+            adjList[_id]= _adjList;
         }
         public void addEdge(int _idA, int _idB)
         {
@@ -337,16 +371,17 @@ public class DroneAI : MonoBehaviour
         }
 
 
-        public Node FindClosestNode(Vector3 target)
+        public Node FindClosestNode(Vector3 target,Graph G)
         {
 
             Node temp;
             Node closest = nodes[0];//root
             float closestDistance = Vector3.Distance(closest.getPosition(), target);
             float checkDistance = 0f;
-            foreach (KeyValuePair<int, Node> node in nodes)
+            
+            for (int i=0; i < G.getSize(); i++)
             {
-                temp = node.Value;
+                temp = G.getNode(i);
                 checkDistance = Vector3.Distance(temp.getPosition(), target);
                 if (checkDistance < closestDistance)
                 {
@@ -361,38 +396,81 @@ public class DroneAI : MonoBehaviour
     }
     public void RRG(int max_nodes,Graph G)
     {
+        float edgeLength = 5.0f;
+        float nodeMinDistance = 1.0f;
+        float addEdgeMaxLength = 10.0f;
+        float radiusMargin = droneCollider.radius + 5.0f;
+
+        int max_iter=100;
         Node close_node=null;
         Vector3 new_coord= new Vector3(0,0,0);
-        for (int i = 0; i<max_nodes; i++)
+        for (int i = 0; i<max_nodes && max_iter>0; i++)
         {
-            bool found = false;
-            while (!found)
-            {
-                Vector3 goal = Pseudo_random(radiusMargin);
-                close_node = G.FindClosestNode(goal);
-                float distance = Vector3.Distance(close_node.getPosition(), goal);
+            //For all the new nodes;
 
-                new_coord = Vector3.Lerp(close_node.getPosition(), goal, edgeLength / distance);
-                if (position_collision(radiusMargin, new_coord) && IsCollidingOnEdge(new_coord, close_node.getPosition()))
-                {
-                    found = true;
+            bool found = false;
+            for (max_iter = 1000; !found && max_iter>0; max_iter--)
+            {
+                Vector3 goal = Pseudo_random(radiusMargin); //Find random point
+                close_node = G.FindClosestNode(goal,G); //Find closest node
+                float distance = Vector3.Distance(close_node.getPosition(), goal); //And compute the distance
+                if (distance > edgeLength)
+                {  //skip if B too close 
+                    new_coord = Vector3.Lerp(close_node.getPosition(), goal, edgeLength / distance);
+                    //distance = Vector3.Distance(new_coord, goal);
+                    if (distance > nodeMinDistance)
+                    {  //skip if C too close
+                        if (!position_collision(radiusMargin, new_coord) && !IsCollidingOnEdge(close_node.getPosition(), new_coord))
+                        {
+                            found = true;
+                        }
+                    }
                 }
             }
-
+            Debug.Log(max_iter);
 
 
             int idx = G.addNode(new Node(new_coord));
             G.addEdge(idx, close_node.getId());
-            foreach (KeyValuePair<int, Node> node in G.getNodes())
+            for ( int j =0; j<G.getSize()-1; j++)
             {
-                Node temp = node.Value;
+                //if(i == j){continue;}
+
+                Node temp = G.getNode(j);
                 float checkDistance = Vector3.Distance(temp.getPosition(), G.getNode(idx).getPosition());
-                if (checkDistance < edgeMaxLength && node.Key != idx && IsCollidingOnEdge(temp.getPosition(), G.getNode(idx).getPosition()))
+                if (checkDistance < addEdgeMaxLength && j != idx && !IsCollidingOnEdge(temp.getPosition(), G.getNode(idx).getPosition()))
                 {
-                    G.addEdge(node.Key, idx);
+                    G.addEdge(j, idx);
                 }
             }
         }
     }
-    
+
+    /*List<int> DikDijkstra(Graph G):
+
+
+    function Dijkstra(Graph, source):
+ 2
+ 3      create vertex set Q
+ 4
+ 5      for each vertex v in Graph:             
+ 6          dist[v] ← INFINITY                  
+ 7          prev[v] ← UNDEFINED                 
+ 8          add v to Q                      
+10      dist[source] ← 0                        
+11      
+12      while Q is not empty:
+13          u ← vertex in Q with min dist[u]    
+14                                              
+15          remove u from Q 
+16          
+17          for each neighbor v of u:           // only v that are still in Q
+18              alt ← dist[u] + length(u, v)
+19              if alt<dist[v]:               
+20                  dist[v] ← alt 
+21                  prev[v] ← u 
+22
+23      return dist[], prev[]*/
+
+
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 using System.Linq;
 using System.Text;
@@ -70,11 +70,19 @@ public class DroneAI : MonoBehaviour
                     Debug.DrawLine(DroneGraph.getNode(i).getPosition(), DroneGraph.getNode(DroneGraph.getAdjList(i)[j]).getPosition(), Color.blue, 100f);
                     //Debug.Log(DroneGraph.getNode(i).getPosition() +" - "+ DroneGraph.getNode(j).getPosition());
             }
-            
-            
-            //Debug.Log(position);
-                
+
         }
+        Node goalN=DroneGraph.FindClosestNode(goal_pos, DroneGraph);
+        int goal_idx = goalN.getId();
+        List<List<int>> paths;
+        paths=dfs(DroneGraph, goal_idx);
+
+        for (int i = 0; i < paths.Count; i++)
+        {
+            Debug.Log(paths[i]);
+        }
+
+
         //my_path.Add(start_pos);
 
         //for (int i = 0; i < 200; i++)
@@ -204,8 +212,12 @@ public class DroneAI : MonoBehaviour
         private double speedX, speedZ, AccellerationX, AccellerationZ, theta;
         private Vector3 position;
         private float x, z;
-
-
+        private int color;
+        public void setColor(int _c)
+        {
+            color = _c;
+        }
+        public int getColor() { return color; }
         public Vector3 getPosition()
         {
             return position;
@@ -284,7 +296,14 @@ public class DroneAI : MonoBehaviour
         // The following constructor has parameters for two of the three 
         // properties. 
 
-
+        public void setColorOfNode(int _idx, int color)
+        {
+             nodes[_idx].setColor(color);
+        }
+        public int getColorOfNode(int _idx)
+        {
+            return nodes[_idx].getColor();
+        }
         public Dictionary<int, Node> getNodes()
         {
             return nodes;
@@ -297,6 +316,7 @@ public class DroneAI : MonoBehaviour
         {
             int id = size++;
             _newNode.setId(id);
+            _newNode.setColor(0);
             nodes.Add(id, _newNode);
             adjList.Add(id, new List<int>());
             return id;
@@ -397,8 +417,8 @@ public class DroneAI : MonoBehaviour
     public void RRG(int max_nodes,Graph G)
     {
         float edgeLength = 5.0f;
-        float nodeMinDistance = 1.0f;
-        float addEdgeMaxLength = 10.0f;
+        float nodeMinDistance = 2.0f;
+        float addEdgeMaxLength =5.0f;
         float radiusMargin = droneCollider.radius + 5.0f;
 
         int max_iter=100;
@@ -444,6 +464,41 @@ public class DroneAI : MonoBehaviour
                 }
             }
         }
+    }
+
+    public void dfs_step(Graph G, int position, List<List<int>> paths,List<int> thisPath, int idx_goal)
+    {
+        
+        G.getNode(position).setColor(1);
+        thisPath.Add(position);
+        if (position == idx_goal)
+        {
+            paths.Add(new List<int>(thisPath));
+            thisPath.RemoveAt(thisPath.Count - 1);
+            G.getNode(position).setColor(0);
+            return;
+        }
+        List<int> child = G.getAdjList(position);
+        for(int i = 0; i < child.Count; i++)
+        {
+            if (G.getNode(child[i]).getColor() == 0) //not visited
+            {
+                dfs_step(G, child[i], paths, thisPath, idx_goal);
+            }
+        }
+        thisPath.RemoveAt(thisPath.Count - 1);
+        G.getNode(position).setColor(0);
+
+    }
+    public List<List<int>>  dfs(Graph G,int idx_goal)
+    {
+
+        List<List<int>> paths = new List<List<int>>();
+        List<int> thisPath = new List<int>();
+        dfs_step(G, 0, paths,thisPath, idx_goal);
+
+
+        return paths;
     }
 
     /*List<int> DikDijkstra(Graph G):

@@ -10,7 +10,7 @@ using UnityEngine;
 [RequireComponent(typeof(DroneController))]
 public class DroneAI : MonoBehaviour
 {
-
+    int counter = 0;
     private DroneController m_Drone; // the car controller we want to use
     SphereCollider droneCollider;
     public float radiusMargin;
@@ -58,6 +58,8 @@ public class DroneAI : MonoBehaviour
         
         for (int i=0; i< DroneGraph.getSize(); i++){
                 GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Collider c = cube.GetComponent<Collider>();
+                c.enabled = false;
                 Vector3 position = DroneGraph.getNode(i).getPosition();
             //Debug.Log("Node n." + i.ToString());
             //foreach (object o in DroneGraph.getAdjList(i))
@@ -67,7 +69,7 @@ public class DroneAI : MonoBehaviour
             cube.transform.position = new Vector3(position.x, 1, position.z);
                 cube.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
                 for (int j = 0; j < DroneGraph.getAdjList(i).Count(); j++){
-                    Debug.DrawLine(DroneGraph.getNode(i).getPosition(), DroneGraph.getNode(DroneGraph.getAdjList(i)[j]).getPosition(), Color.blue, 100f);
+                    //Debug.DrawLine(DroneGraph.getNode(i).getPosition(), DroneGraph.getNode(DroneGraph.getAdjList(i)[j]).getPosition(), Color.blue, 100f);
                     //Debug.Log(DroneGraph.getNode(i).getPosition() +" - "+ DroneGraph.getNode(j).getPosition());
             }
 
@@ -77,12 +79,32 @@ public class DroneAI : MonoBehaviour
         List<List<int>> paths;
         paths=dfs(DroneGraph, goal_idx);
 
-        for (int i = 0; i < paths.Count; i++)
+        /* for (int i = 0; i < paths.Count; i++)
+         {
+              var
+         }
+         */
+        if (paths[0].SequenceEqual(paths[1]))
         {
-            Debug.Log(paths[i]);
+            Debug.Log("DAMN THEY ARE EQUAL!");
         }
 
 
+        foreach (var p in paths)
+        {
+            Color color = Color.white;
+            color.r = UnityEngine.Random.Range(0f, 1f);
+            color.g = UnityEngine.Random.Range(0f, 1f);
+            color.b = UnityEngine.Random.Range(0f, 1f);
+            Vector3 old_wp = start_pos;
+            foreach (var wp in p)
+            {
+
+
+                Debug.DrawLine(old_wp, DroneGraph.getNode(wp).getPosition(), color, 100f);
+                old_wp = DroneGraph.getNode(wp).getPosition();
+            }
+        }
         //my_path.Add(start_pos);
 
         //for (int i = 0; i < 200; i++)
@@ -141,8 +163,8 @@ public class DroneAI : MonoBehaviour
 
     bool position_collision(float radiusMargin, Vector3 position)
     {
-        float[,] radiusHelpMatrix = new float[,] { { radiusMargin, 0.0f }, { -radiusMargin, 0.0f }, { 0.0f, radiusMargin }, { 0.0f, -radiusMargin } };
-        for (int a = 0; a < 4; a = a + 1)
+        float[,] radiusHelpMatrix = new float[,] { { radiusMargin, radiusMargin }, { radiusMargin, -radiusMargin }, { -radiusMargin, radiusMargin }, { -radiusMargin, -radiusMargin }, { radiusMargin, 0.0f }, { -radiusMargin, 0.0f }, { 0.0f, radiusMargin }, { 0.0f, -radiusMargin } };
+        for (int a = 0; a < 8; a = a + 1)
         {
             int i = terrain_manager.myInfo.get_i_index(position.x + radiusHelpMatrix[a, 0]);
             int j = terrain_manager.myInfo.get_j_index(position.z + radiusHelpMatrix[a, 1]);
@@ -184,7 +206,7 @@ public class DroneAI : MonoBehaviour
             cordx = UnityEngine.Random.Range(terrain_manager.myInfo.x_low, terrain_manager.myInfo.x_high);
             cordz = UnityEngine.Random.Range(terrain_manager.myInfo.z_low, terrain_manager.myInfo.z_high);
             bool traversbel = true;
-            for (int a = 0; a < 4; a = a + 1)
+            for (int a = 0; a < 8; a = a + 1)
             {
                 int i = terrain_manager.myInfo.get_i_index(cordx + radiusHelpMatrix[a, 0]);
                 int j = terrain_manager.myInfo.get_j_index(cordz + radiusHelpMatrix[a, 1]);
@@ -417,9 +439,9 @@ public class DroneAI : MonoBehaviour
     public void RRG(int max_nodes,Graph G)
     {
         float edgeLength = 5.0f;
-        float nodeMinDistance = 2.0f;
+        float nodeMinDistance = 3.0f;
         float addEdgeMaxLength =5.0f;
-        float radiusMargin = droneCollider.radius + 5.0f;
+        float radiusMargin = droneCollider.radius + 0.5f;
 
         int max_iter=100;
         Node close_node=null;
@@ -438,13 +460,13 @@ public class DroneAI : MonoBehaviour
                 {  //skip if B too close 
                     new_coord = Vector3.Lerp(close_node.getPosition(), goal, edgeLength / distance);
                     //distance = Vector3.Distance(new_coord, goal);
-                    if (distance > nodeMinDistance)
-                    {  //skip if C too close
+                    //if (distance > nodeMinDistance)
+                    //{  //skip if C too close to another point
                         if (!position_collision(radiusMargin, new_coord) && !IsCollidingOnEdge(close_node.getPosition(), new_coord))
                         {
                             found = true;
                         }
-                    }
+                    //}
                 }
             }
             Debug.Log(max_iter);
@@ -471,8 +493,13 @@ public class DroneAI : MonoBehaviour
         
         G.getNode(position).setColor(1);
         thisPath.Add(position);
+        if (counter>=20)
+        {
+            return;
+        }
         if (position == idx_goal)
         {
+            counter++;
             paths.Add(new List<int>(thisPath));
             thisPath.RemoveAt(thisPath.Count - 1);
             G.getNode(position).setColor(0);

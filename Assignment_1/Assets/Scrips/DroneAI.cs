@@ -69,26 +69,23 @@ public class DroneAI : MonoBehaviour
             cube.transform.position = new Vector3(position.x, 1, position.z);
                 cube.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
                 for (int j = 0; j < DroneGraph.getAdjList(i).Count(); j++){
-                    //Debug.DrawLine(DroneGraph.getNode(i).getPosition(), DroneGraph.getNode(DroneGraph.getAdjList(i)[j]).getPosition(), Color.blue, 100f);
+                    Debug.DrawLine(DroneGraph.getNode(i).getPosition(), DroneGraph.getNode(DroneGraph.getAdjList(i)[j]).getPosition(), Color.blue, 100f);
                     //Debug.Log(DroneGraph.getNode(i).getPosition() +" - "+ DroneGraph.getNode(j).getPosition());
             }
-
+            Debug.Log("Adj list of node " + i.ToString());
+            var strings = string.Join(", ", DroneGraph.getAdjList(i));
+            Debug.Log(strings);
         }
         Node goalN=DroneGraph.FindClosestNode(goal_pos, DroneGraph);
         int goal_idx = goalN.getId();
         List<List<int>> paths;
         paths=dfs(DroneGraph, goal_idx);
 
-        /* for (int i = 0; i < paths.Count; i++)
-         {
-              var
-         }
-         */
-        if (paths[0].SequenceEqual(paths[1]))
-        {
-            Debug.Log("DAMN THEY ARE EQUAL!");
-        }
 
+         
+  
+
+        
 
         foreach (var p in paths)
         {
@@ -367,12 +364,16 @@ public class DroneAI : MonoBehaviour
             List<int> actualList;
 
             actualList = adjList[_idA];
-            actualList.Add(_idB);
-            setAdjList(_idA, actualList);
-
+            if (!actualList.Contains(_idB)) { 
+                actualList.Add(_idB);
+                setAdjList(_idA, actualList);
+            }
             actualList = adjList[_idB];
-            actualList.Add(_idA);
-            setAdjList(_idB, actualList);
+            if (!actualList.Contains(_idA))
+            {
+                actualList.Add(_idA);
+                setAdjList(_idB, actualList);
+            }
         }
 
         public double computeAngle(Node _A, Node _B, Node _C)
@@ -439,8 +440,8 @@ public class DroneAI : MonoBehaviour
     public void RRG(int max_nodes,Graph G)
     {
         float edgeLength = 5.0f;
-        float nodeMinDistance = 3.0f;
-        float addEdgeMaxLength =5.0f;
+        float nodeMinDistance = 2.5f;
+        float addEdgeMaxLength = 8.0f;
         float radiusMargin = droneCollider.radius + 0.5f;
 
         int max_iter=100;
@@ -459,17 +460,17 @@ public class DroneAI : MonoBehaviour
                 if (distance > edgeLength)
                 {  //skip if B too close 
                     new_coord = Vector3.Lerp(close_node.getPosition(), goal, edgeLength / distance);
-                    //distance = Vector3.Distance(new_coord, goal);
-                    //if (distance > nodeMinDistance)
-                    //{  //skip if C too close to another point
+                    distance = Vector3.Distance(new_coord, G.FindClosestNode(new_coord, G).getPosition());
+                    if (distance > nodeMinDistance)
+                    {  //skip if C too close to another point
                         if (!position_collision(radiusMargin, new_coord) && !IsCollidingOnEdge(close_node.getPosition(), new_coord))
                         {
                             found = true;
                         }
-                    //}
+                    }
                 }
             }
-            Debug.Log(max_iter);
+            //Debug.Log(max_iter);
 
 
             int idx = G.addNode(new Node(new_coord));
@@ -493,14 +494,19 @@ public class DroneAI : MonoBehaviour
         
         G.getNode(position).setColor(1);
         thisPath.Add(position);
-        if (counter>=20)
+        if (counter>=100)
         {
             return;
         }
         if (position == idx_goal)
         {
             counter++;
-            paths.Add(new List<int>(thisPath));
+            Debug.Log(counter);
+            var strings = string.Join(", ", thisPath);
+            Debug.Log(strings);
+
+            List<int> good_path = new List<int>(thisPath);
+            paths.Add(good_path);
             thisPath.RemoveAt(thisPath.Count - 1);
             G.getNode(position).setColor(0);
             return;

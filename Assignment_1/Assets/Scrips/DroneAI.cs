@@ -27,7 +27,7 @@ public class DroneAI : MonoBehaviour
     Vector3 goal_pos;
     private void Start()
     {
-        int n = 500;
+        int n = 10000   ;
         Debug.Log("Starting");
 
         // get the drone controller
@@ -55,7 +55,7 @@ public class DroneAI : MonoBehaviour
         // ...
         
         RRG(n, DroneGraph);
-        
+        killFuckers(DroneGraph);
         for (int i=0; i< DroneGraph.getSize(); i++){
                 GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 Collider c = cube.GetComponent<Collider>();
@@ -72,21 +72,31 @@ public class DroneAI : MonoBehaviour
                     Debug.DrawLine(DroneGraph.getNode(i).getPosition(), DroneGraph.getNode(DroneGraph.getAdjList(i)[j]).getPosition(), Color.blue, 100f);
                     //Debug.Log(DroneGraph.getNode(i).getPosition() +" - "+ DroneGraph.getNode(j).getPosition());
             }
-            Debug.Log("Adj list of node " + i.ToString());
-            var strings = string.Join(", ", DroneGraph.getAdjList(i));
-            Debug.Log(strings);
+            //Debug.Log("Adj list of node " + i.ToString());
+            //var strings = string.Join(", ", DroneGraph.getAdjList(i));
+            //Debug.Log(strings);
+
         }
         Node goalN=DroneGraph.FindClosestNode(goal_pos, DroneGraph);
         int goal_idx = goalN.getId();
-        List<List<int>> paths;
-        paths=dfs(DroneGraph, goal_idx);
+        List<int> path = new List<int>();
+        //paths=dfs(DroneGraph, goal_idx);
+        ASuperStar(DroneGraph, goal_idx);
+        path = getBestPath(DroneGraph, goal_idx);
 
 
-         
-  
+        Vector3 old_wp = start_pos;
+        Debug.Log("Printing space now");
+        foreach (var wp in path)
+        {
 
-        
+            Debug.Log(Vector3.Distance(old_wp, DroneGraph.getNode(wp).getPosition()));
+            Debug.DrawLine(old_wp, DroneGraph.getNode(wp).getPosition(), Color.red, 100f);
+            old_wp = DroneGraph.getNode(wp).getPosition();
+        }
 
+
+        /*
         foreach (var p in paths)
         {
             Color color = Color.white;
@@ -102,6 +112,7 @@ public class DroneAI : MonoBehaviour
                 old_wp = DroneGraph.getNode(wp).getPosition();
             }
         }
+        */
         //my_path.Add(start_pos);
 
         //for (int i = 0; i < 200; i++)
@@ -178,8 +189,9 @@ public class DroneAI : MonoBehaviour
     {
         from.y = 3;
         to.y = 3;
-        
-        bool hit = Physics.Raycast(from, to - from, Vector3.Distance(from,to));
+
+        RaycastHit rayHit;
+        bool hit = Physics.SphereCast(from, radiusMargin ,to - from, out rayHit,Vector3.Distance(from,to));
         if (hit) { 
             return true; }
         return false;
@@ -232,6 +244,16 @@ public class DroneAI : MonoBehaviour
         private Vector3 position;
         private float x, z;
         private int color;
+        private int parent;
+        
+        public int getParent()
+        {
+            return parent;
+        }
+        public void setParent(int p)
+        {
+            parent = p;
+        }
         public void setColor(int _c)
         {
             color = _c;
@@ -305,7 +327,7 @@ public class DroneAI : MonoBehaviour
         int size;
 
         public Graph() {
-            Debug.Log("I am in the constructor");
+
         nodes =  new Dictionary<int, Node>();
         adjList =  new Dictionary<int, List<int>>();
         endNodes = new List<int>();
@@ -387,6 +409,8 @@ public class DroneAI : MonoBehaviour
             double angle = Math.Acos(num / (den + 0.000001f));
             return angle;
         }
+
+
         public void setPathTheta(List<int> _path)
         {
             int A, B, C = 0;
@@ -437,14 +461,21 @@ public class DroneAI : MonoBehaviour
 
 
     }
+    public float computeAngle2(Node _A, Node _B, Node _C)
+    {
+        Vector3 aa = _A.getPosition() - _B.getPosition();
+        Vector3 bb = _C.getPosition() - _B.getPosition();
+        return Vector3.Angle(aa, bb);
+    }
+
     public void RRG(int max_nodes,Graph G)
     {
         float edgeLength = 5.0f;
         float nodeMinDistance = 2.5f;
-        float addEdgeMaxLength = 8.0f;
+        float addEdgeMaxLength = 10.0f;
         float radiusMargin = droneCollider.radius + 0.5f;
 
-        int max_iter=100;
+        int max_iter=10000;
         Node close_node=null;
         Vector3 new_coord= new Vector3(0,0,0);
         for (int i = 0; i<max_nodes && max_iter>0; i++)
@@ -452,7 +483,7 @@ public class DroneAI : MonoBehaviour
             //For all the new nodes;
 
             bool found = false;
-            for (max_iter = 1000; !found && max_iter>0; max_iter--)
+            for (max_iter = 10000; !found && max_iter>0; max_iter--)
             {
                 Vector3 goal = Pseudo_random(radiusMargin); //Find random point
                 close_node = G.FindClosestNode(goal,G); //Find closest node
@@ -460,14 +491,14 @@ public class DroneAI : MonoBehaviour
                 if (distance > edgeLength)
                 {  //skip if B too close 
                     new_coord = Vector3.Lerp(close_node.getPosition(), goal, edgeLength / distance);
-                    distance = Vector3.Distance(new_coord, G.FindClosestNode(new_coord, G).getPosition());
-                    if (distance > nodeMinDistance)
-                    {  //skip if C too close to another point
+                    //distance = Vector3.Distance(new_coord, G.FindClosestNode(new_coord, G).getPosition());
+                    //if (distance > nodeMinDistance)
+                    //{  //skip if C too close to another point WE DONT FUCKING NEED THIS CHECK, BECAUSE CLOSE_NODE WILL ALWAISE BE THE CLOSEST TO  B
                         if (!position_collision(radiusMargin, new_coord) && !IsCollidingOnEdge(close_node.getPosition(), new_coord))
                         {
                             found = true;
                         }
-                    }
+                    //}
                 }
             }
             //Debug.Log(max_iter);
@@ -477,8 +508,6 @@ public class DroneAI : MonoBehaviour
             G.addEdge(idx, close_node.getId());
             for ( int j =0; j<G.getSize()-1; j++)
             {
-                //if(i == j){continue;}
-
                 Node temp = G.getNode(j);
                 float checkDistance = Vector3.Distance(temp.getPosition(), G.getNode(idx).getPosition());
                 if (checkDistance < addEdgeMaxLength && j != idx && !IsCollidingOnEdge(temp.getPosition(), G.getNode(idx).getPosition()))
@@ -534,31 +563,181 @@ public class DroneAI : MonoBehaviour
         return paths;
     }
 
-    /*List<int> DikDijkstra(Graph G):
+    public List<int> getBestPath(Graph G,int idx_goal)
+    {
+        List<int> path = new List<int>();
+        path.Add(idx_goal);
+        int idx = idx_goal;
+        while( idx != 0)
+        {
+            idx = G.getNode(idx).getParent();
+            path.Add(idx);
+        }
+        path.Reverse();
+        return path;
+    }
+
+    public void killFuckers(Graph G)
+    {
+        int i,j,x;
+        List<int> adj = new List<int>();
+        for (i = 0;i  < G.getSize(); i++)
+        {
+            adj = G.getAdjList(i);
+
+            for (j=0;j<adj.Count;j++)
+            {
+                Debug.Log(Vector3.Distance(G.getNode(i).getPosition(), G.getNode(adj[j]).getPosition()));
+
+                if (Vector3.Distance(G.getNode(i).getPosition(), G.getNode(adj[j]).getPosition())> 10)
+                {
+                    Debug.Log("KILLLL!");
+                    x = adj[j];
+                    G.getAdjList(i).Remove(x);
+                    G.getAdjList(x).Remove(i);
+                    j--;
+                }
+            }
+        }
+    }
+    public void ASuperStar(Graph G, int idx_goal)
+    {
+        priorityQueue Q = new priorityQueue();
 
 
-    function Dijkstra(Graph, source):
- 2
- 3      create vertex set Q
- 4
- 5      for each vertex v in Graph:             
- 6          dist[v] ← INFINITY                  
- 7          prev[v] ← UNDEFINED                 
- 8          add v to Q                      
-10      dist[source] ← 0                        
-11      
-12      while Q is not empty:
-13          u ← vertex in Q with min dist[u]    
-14                                              
-15          remove u from Q 
-16          
-17          for each neighbor v of u:           // only v that are still in Q
-18              alt ← dist[u] + length(u, v)
-19              if alt<dist[v]:               
-20                  dist[v] ← alt 
-21                  prev[v] ← u 
-22
-23      return dist[], prev[]*/
+        int best_node;
+        float best_cost;
 
 
+        float total_cost;
+        Q.enqueue(0, 0);
+
+        while(Q.getSize()!=0)
+        {
+            best_node = Q.dequeue();
+            best_cost = Q.getCost(best_node);
+            //Delete node
+            Q.removeNode(best_node);
+
+            if (idx_goal == best_node){
+                return;
+            }
+
+            foreach (int child in G.getAdjList(best_node)){
+                total_cost = computeCost(G, best_node, child, idx_goal) + best_cost;
+
+                if (Q.isInQueue(child))
+                {
+                    if (Q.getCost(child) > total_cost)
+                    {
+                        G.getNode(child).setParent(best_node);
+                        Q.updateCost(child,total_cost);
+                    }
+                }
+                else
+                {
+                    if (G.getNode(child).getColor() == 0)
+                    {
+                        Q.enqueue(child, total_cost);
+                        G.getNode(child).setParent(best_node);
+                        G.getNode(child).setColor(1);
+                    }
+                }
+
+
+            }
+        }
+
+
+    }
+
+    public class priorityQueue
+    {
+        List<int> values;
+        List<float> priority;
+
+        public priorityQueue()
+        {
+            values = new List<int>();
+            priority = new List<float>();
+        }
+        public void enqueue(int _value, float _p)
+        {
+            values.Add(_value);
+            priority.Add(_p);
+        }
+        public int getSize()
+        {
+            return values.Count();
+        }
+        public int dequeue()
+        {
+            int best_idx = priority.IndexOf(priority.Min());
+            int best_node = values[best_idx];
+
+
+            return best_node;
+        }
+        public void removeNode(int node)
+        {
+            int node_idx = values.IndexOf(node);
+            priority.RemoveAt(node_idx);
+            values.RemoveAt(node_idx);
+        }
+        public float getCost(int node)
+        {
+            int idx = values.IndexOf(node);
+            return priority[idx];
+        }
+        public void updateCost(int node, float p)
+        {
+            int idx = values.IndexOf(node);
+            priority[idx] = p;
+        }
+        public bool isInQueue(int node)
+        {
+            int idx = values.IndexOf(node);
+            if (idx == -1) { return false; }
+            return true;
+        }
+    }
+
+    public float computeCost(Graph G, int parent, int child, int goal)
+    {
+        //REAL COST:
+        float real_cost;
+        float h_cost;
+        float actual_angle = 0;
+        float best_angle=0;
+        float max_speed = 15;
+        float alpha = 1 / 10;
+        
+        foreach (var n in G.getAdjList(child))
+        {
+            actual_angle = computeAngle2(G.getNode(parent), G.getNode(child), G.getNode(n));
+            if (actual_angle > best_angle)
+            {
+                best_angle = actual_angle;
+            }
+        }
+        max_speed = 1 / (1 +  ((180 - best_angle)*alpha) * ((180 - best_angle) * alpha));
+        //max_speed = 15;
+        real_cost = Vector3.Distance(G.getNode(parent).getPosition(), G.getNode(child).getPosition())/max_speed; /// max_speed;
+
+
+        RaycastHit rayHit;
+        bool hit = Physics.SphereCast(G.getNode(child).getPosition(), radiusMargin, G.getNode(goal).getPosition()- G.getNode(child).getPosition(), out rayHit, Vector3.Distance(G.getNode(child).getPosition(), G.getNode(goal).getPosition()));
+        if (!hit)
+        {
+            h_cost = 0;
+        }
+        else
+        {
+            h_cost = Vector3.Distance(G.getNode(child).getPosition(), G.getNode(goal).getPosition());
+        }
+
+
+        return 3*real_cost+h_cost;
+
+    }
 }

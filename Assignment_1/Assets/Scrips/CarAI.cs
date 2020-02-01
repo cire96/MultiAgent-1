@@ -161,35 +161,6 @@ namespace UnityStandardAssets.Vehicles.Car
                 }*/
                 m_Car.Move(newSteer,newSpeed, newBreak, 0);
                 
-                /*Vector3 thirdWay=new Vector3(0,0,0);
-                Vector3 secondWay= new Vector3(0,0,0);
-                Vector3 way=Vector3.Lerp(new Vector3(0,0,0),target,1)-Vector3.Lerp(new Vector3(0,0,0),transform.position,1);
-                if(targetId+1!=my_path.Count()-1){
-                    if(targetId+2!=my_path.Count()-1){
-                        thirdWay = Vector3.Lerp(new Vector3(0,0,0),my_path[targetId+2].getPosition(),1)-Vector3.Lerp(new Vector3(0,0,0),transform.position,1);
-
-                    }
-                    secondWay = Vector3.Lerp(new Vector3(0,0,0),my_path[targetId+1].getPosition(),1)-Vector3.Lerp(new Vector3(0,0,0),transform.position,1);
-                }*/
-                
-
-                
-                /*bool hit = Physics.SphereCast(transform.position,Margin, steeringPoint,out rayHit, breakingDistance+5.0f);
-                if(hit){
-                    //controller.velocity*5.0f*controller.velocity.magnitude;
-                }else if(targetId+1!=my_path.Count-1){
-                    if(targetId+2!=my_path.Count()-1){
-                        float s = 6.0f;
-                        way=0.1f*(way*(s*s) + secondWay*s + thirdWay);
-                        Debug.DrawLine(transform.position,target, Color.white);
-                    }
-                    float targetAngel = Vector3.Angle(controller.acceleration,Vector3.Lerp(target,my_path[targetId+1].getPosition(),1));
-                    if(breakingDistance >= distanceToTarget){
-                        print("angel:" + targetAngel.ToString());
-                        way=secondWay-controller.velocity*(0.01f*(180-targetAngel));//(controller.acceleration*0.01f*(180-targetAngel));
-
-                    }
-                }*/
                 
                 
 

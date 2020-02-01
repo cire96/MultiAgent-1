@@ -25,6 +25,8 @@ public class DroneAI : MonoBehaviour
 
     int randomTimer = 0;
     Vector3 goal_pos;
+    int lastPointInPath=0;
+    List<Node> my_path = new List<Node>();
     private void Start()
     {
         int n = 10000   ;
@@ -33,7 +35,7 @@ public class DroneAI : MonoBehaviour
         // get the drone controller
         m_Drone = GetComponent<DroneController>();
         droneCollider = GetComponent<SphereCollider>();
-        float radiusMargin = droneCollider.radius + 0.5f;
+        radiusMargin = droneCollider.radius + 0.5f;
 
         terrain_manager = terrain_manager_game_object.GetComponent<TerrainManager>();
 
@@ -96,6 +98,8 @@ public class DroneAI : MonoBehaviour
         }
 
 
+
+
         /*
         foreach (var p in paths)
         {
@@ -136,29 +140,116 @@ public class DroneAI : MonoBehaviour
         //}
         //
 
+        my_path = pathHelp(DroneGraph,path);
+
+
     }
 
-    //void onDrawGizmos(Vector3 position) {
-    //    Gizmos.color = Color.red;
-    //    Gizmos(position, 1f);
-    //}
+    List<Node> pathHelp(Graph G,List<int> idList){
+        List<Node> nodeList = new List<Node>();
+        foreach(int i in idList){
+            nodeList.Add(G.getNode(i));
+        }
+        return nodeList;
+    }
 
-    private void FixedUpdate()
-    {
+
+
+    private void FixedUpdate(){   
+        DroneController controller=transform.GetComponent<DroneController>();
+
         // Execute your path here
         // ...
 
         // this is how you access information about the terrain
-        int i = terrain_manager.myInfo.get_i_index(transform.position.x);
-        int j = terrain_manager.myInfo.get_j_index(transform.position.z);
-        float grid_center_x = terrain_manager.myInfo.get_x_pos(i);
-        float grid_center_z = terrain_manager.myInfo.get_z_pos(j);
+        if(lastPointInPath==my_path.Count()-1){
+            Vector3 way=Vector3.Lerp(new Vector3(0,0,0),goal_pos,1)-Vector3.Lerp(new Vector3(0,0,0),transform.position,1);
+            m_Drone.Move(way.x, way.z);
+        }else{
+            for(int i=lastPointInPath;i<my_path.Count();i=i+1){
+                if (5.0f>=Vector3.Distance(my_path[i].getPosition(),transform.position)){
+                    lastPointInPath=i;
+                }
+            }
+            if(lastPointInPath!=my_path.Count()-1){
+                
+                Vector3 target=my_path[lastPointInPath+1].getPosition();
+                float distanceToTargetTemp = Vector3.Distance(transform.position,target);
+                int targetId=0;
+                for(int i=lastPointInPath+2;i<my_path.Count();i=i+1){
+                    float newDistance=Vector3.Distance(transform.position,my_path[i].getPosition());
+                    if(distanceToTargetTemp>newDistance){
+                        distanceToTargetTemp=newDistance;
+                        target=my_path[i].getPosition();
+                        targetId=i;
+                    }
+                }
 
-        Debug.DrawLine(transform.position, new Vector3(grid_center_x, 0f, grid_center_z), Color.white, 1f);
+                
+                // this is how you control the car
+                Vector3 thirdWay=new Vector3(0,0,0);
+                Vector3 secondWay= new Vector3(0,0,0);
+                Vector3 way=Vector3.Lerp(new Vector3(0,0,0),target,1)-Vector3.Lerp(new Vector3(0,0,0),transform.position,1);
+                if(targetId+1!=my_path.Count()-1){
+                    if(targetId+2!=my_path.Count()-1){
+                        thirdWay = Vector3.Lerp(new Vector3(0,0,0),my_path[targetId+2].getPosition(),1)-Vector3.Lerp(new Vector3(0,0,0),transform.position,1);
 
-        // this is how you control the car
-        m_Drone.Move(0.0f, 0.0f);
+                    }
+                    secondWay = Vector3.Lerp(new Vector3(0,0,0),my_path[targetId+1].getPosition(),1)-Vector3.Lerp(new Vector3(0,0,0),transform.position,1);
+                }
+                
 
+
+                float breakingDistance = (controller.velocity.magnitude*controller.velocity.magnitude)/(2*controller.acceleration.magnitude);
+                float distanceToTarget = Vector3.Distance(transform.position,target);
+                RaycastHit rayHit;
+                bool hit = Physics.SphereCast(transform.position,radiusMargin, controller.velocity,out rayHit, breakingDistance+5.0f);
+                
+                
+                if(hit){
+                    way=way-controller.velocity*5.0f*controller.velocity.magnitude;
+                }else if(targetId+1!=my_path.Count()-1){
+                    
+                    /*if(targetId+2!=my_path.Count()-1){
+                        float s = 6.0f;
+                        way=0.1f*(way*(s*s) + secondWay*s + thirdWay);
+                        Debug.DrawLine(transform.position,target, Color.white);
+                    }*/
+
+                    float targetAngel = Vector3.Angle(controller.acceleration,Vector3.Lerp(target,my_path[targetId+1].getPosition(),1));
+                    
+                    //controller.acceleration
+                    //Vector3.Lerp(target,my_path[targetId+1].getPosition(),1)
+                    if(breakingDistance >= distanceToTarget){
+                        print("angel:" + targetAngel.ToString());
+                        way=secondWay-controller.velocity*(0.01f*(180-targetAngel));//(controller.acceleration*0.01f*(180-targetAngel));
+
+                    }
+                    /*else if(lastPointInPath+1!=my_path.Count()-1){
+                        way=way;//*0.01f*distanceToTarget;
+
+                        //float L=Vector3.Distance(transform.position,my_path[lastPointInPath+2])-distanceToTarget;
+                        //way=Vector3.Lerp(new Vector3(0,0,0),my_path[lastPointInPath+2],1)-Vector3.Lerp(new Vector3(0,0,0),transform.position,1)+way;
+
+                    }*/
+
+
+                }
+                
+                
+                m_Drone.Move(way.x, way.z);
+                /*Vector3 newVelocity=controller.velocity + way.normalized * Time.fixedDeltaTime;
+                if(10.0f>newVelocity.magnitude){
+                    m_Drone.Move(way.normalized.x, way.normalized.z);
+                }*/
+
+                //Debug.DrawLine(transform.position,target, Color.white);
+                Debug.DrawLine(transform.position,transform.position+controller.velocity, Color.red);
+                Debug.DrawLine(transform.position,transform.position+controller.acceleration, Color.black);
+                //Debug.DrawLine(new Vector3(0,0,0),transform.position, Color.white);
+
+            }
+        }
     }
 
 

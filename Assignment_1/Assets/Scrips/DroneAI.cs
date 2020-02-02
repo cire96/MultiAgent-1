@@ -13,7 +13,7 @@ public class DroneAI : MonoBehaviour
     int counter = 0;
     private DroneController m_Drone; // the car controller we want to use
     SphereCollider droneCollider;
-    public float radiusMargin;
+
 
     public GameObject terrain_manager_game_object;
     TerrainManager terrain_manager;
@@ -35,7 +35,7 @@ public class DroneAI : MonoBehaviour
         // get the drone controller
         m_Drone = GetComponent<DroneController>();
         droneCollider = GetComponent<SphereCollider>();
-        radiusMargin = droneCollider.radius + 0.5f;
+        //radiusMargin = droneCollider.radius + 0.5f;
 
         terrain_manager = terrain_manager_game_object.GetComponent<TerrainManager>();
 
@@ -156,6 +156,7 @@ public class DroneAI : MonoBehaviour
 
 
     private void FixedUpdate(){   
+        float radiusMargin = droneCollider.radius + 0.5f;
         DroneController controller=transform.GetComponent<DroneController>();
 
         // Execute your path here
@@ -276,7 +277,7 @@ public class DroneAI : MonoBehaviour
         return false;
     }
 
-    bool IsCollidingOnEdge(Vector3 from, Vector3 to)
+    bool IsCollidingOnEdge(Vector3 from, Vector3 to,float radiusMargin)
     {
         from.y = 3;
         to.y = 3;
@@ -564,7 +565,7 @@ public class DroneAI : MonoBehaviour
         float edgeLength = 5.0f;
         float nodeMinDistance = 2.5f;
         float addEdgeMaxLength = 10.0f;
-        float radiusMargin = droneCollider.radius + 0.5f;
+        float radiusMargin = droneCollider.radius + 3.0f;
 
         int max_iter=10000;
         Node close_node=null;
@@ -585,7 +586,7 @@ public class DroneAI : MonoBehaviour
                     //distance = Vector3.Distance(new_coord, G.FindClosestNode(new_coord, G).getPosition());
                     //if (distance > nodeMinDistance)
                     //{  //skip if C too close to another point WE DONT FUCKING NEED THIS CHECK, BECAUSE CLOSE_NODE WILL ALWAISE BE THE CLOSEST TO  B
-                        if (!position_collision(radiusMargin, new_coord) && !IsCollidingOnEdge(close_node.getPosition(), new_coord))
+                        if (!position_collision(radiusMargin, new_coord) && !IsCollidingOnEdge(close_node.getPosition(), new_coord,radiusMargin))
                         {
                             found = true;
                         }
@@ -601,7 +602,7 @@ public class DroneAI : MonoBehaviour
             {
                 Node temp = G.getNode(j);
                 float checkDistance = Vector3.Distance(temp.getPosition(), G.getNode(idx).getPosition());
-                if (checkDistance < addEdgeMaxLength && j != idx && !IsCollidingOnEdge(temp.getPosition(), G.getNode(idx).getPosition()))
+                if (checkDistance < addEdgeMaxLength && j != idx && !IsCollidingOnEdge(temp.getPosition(), G.getNode(idx).getPosition(),radiusMargin))
                 {
                     G.addEdge(j, idx);
                 }
@@ -693,6 +694,7 @@ public class DroneAI : MonoBehaviour
     }
     public void ASuperStar(Graph G, int idx_goal)
     {
+        float radiusMargin = droneCollider.radius + 1.5f;
         priorityQueue Q = new priorityQueue();
 
 
@@ -715,7 +717,7 @@ public class DroneAI : MonoBehaviour
             }
 
             foreach (int child in G.getAdjList(best_node)){
-                total_cost = computeCost(G, best_node, child, idx_goal) + best_cost;
+                total_cost = computeCost(G, best_node, child, idx_goal, radiusMargin) + best_cost;
 
                 if (Q.isInQueue(child))
                 {
@@ -793,7 +795,7 @@ public class DroneAI : MonoBehaviour
         }
     }
 
-    public float computeCost(Graph G, int parent, int child, int goal)
+    public float computeCost(Graph G, int parent, int child, int goal, float radiusMargin)
     {
         //REAL COST:
         float real_cost;

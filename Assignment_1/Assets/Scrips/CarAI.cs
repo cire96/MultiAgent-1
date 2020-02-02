@@ -1,4 +1,7 @@
-﻿using System.Collections;
+﻿using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System;
@@ -65,7 +68,7 @@ namespace UnityStandardAssets.Vehicles.Car
                 //}
                 cube.transform.position = new Vector3(position.x, 1, position.z);
                     cube.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
-                    for (int j = 0; j < DroneGraph.getAdjList(i).Count(); j++){
+                    for (int j = 0; j < DroneGraph.getAdjList(i).Count; j++){
                         Debug.DrawLine(DroneGraph.getNode(i).getPosition(), DroneGraph.getNode(DroneGraph.getAdjList(i)[j]).getPosition(), Color.blue, 100f);
                         //Debug.Log(DroneGraph.getNode(i).getPosition() +" - "+ DroneGraph.getNode(j).getPosition());
                 }
@@ -425,7 +428,7 @@ namespace UnityStandardAssets.Vehicles.Car
                 A = _path[0];
                 nodes[A].setTheta(0);
 
-                for (int i = 1; i < _path.Count() - 1; i++)
+                for (int i = 1; i < _path.Count - 1; i++)
                 {
                     A = _path[i - 1];
                     B = _path[i];
@@ -676,7 +679,7 @@ namespace UnityStandardAssets.Vehicles.Car
             }
             public int getSize()
             {
-                return values.Count();
+                return values.Count;
             }
             public int dequeue()
             {

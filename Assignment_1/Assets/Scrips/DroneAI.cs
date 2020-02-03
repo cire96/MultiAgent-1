@@ -59,6 +59,8 @@ public class DroneAI : MonoBehaviour
         
         RRG(n, DroneGraph);
         killFuckers(DroneGraph);
+        Debug.Log("Computing Distance to wall");
+        computeDiStanceToWall(DroneGraph);
         for (int i=0; i< DroneGraph.getSize(); i++){
                 GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 Collider c = cube.GetComponent<Collider>();
@@ -232,18 +234,18 @@ public class DroneAI : MonoBehaviour
             if(targetId==my_path.Count-1 && breakingDistance >= distanceToTarget) {
                 m_Drone.Move(-controller.velocity.x * 100, -controller.velocity.z * 100);
             }
-            else if (controller.velocity.magnitude > 3 && targetId < my_path.Count - 2 && (my_path[targetId].getTheta() < 120 || my_path[targetId+1].getTheta() < 120 || my_path[targetId+2].getTheta() < 120) && breakingDistance >= distanceToTarget)
+            else if (controller.velocity.magnitude > 3 && targetId < my_path.Count - 2 && ((my_path[targetId].getTheta() < 130) || (my_path[targetId+1].getTheta() < 130) || (my_path[targetId+2].getTheta() < 130)) && breakingDistance >= distanceToTarget*3)
             {
                 m_Drone.Move(-controller.velocity.x * 100, -controller.velocity.z * 100);
             } 
-           /* else if ((my_path[targetId].getTheta() < 140 || my_path[targetId + 1].getTheta() < 140) && breakingDistance >= distanceToTarget * 2)
+            else if (controller.velocity.magnitude > 3 && targetId < my_path.Count - 2  && ((my_path[targetId].getTheta() < 110) || (my_path[targetId + 1].getTheta() < 110) || (my_path[targetId + 2].getTheta() < 110)) && breakingDistance >= distanceToTarget * 2)
             {
                 m_Drone.Move(-controller.velocity.x * 100, -controller.velocity.z * 100);
             }
-            else if((my_path[targetId].getTheta() < 120 || my_path[targetId + 1].getTheta() < 120) && breakingDistance >= distanceToTarget)
+            else if(controller.velocity.magnitude > 3 && targetId < my_path.Count - 2 && ((my_path[targetId].getTheta() < 90) || (my_path[targetId + 1].getTheta() < 90) ||( my_path[targetId + 2].getTheta() < 90)) && breakingDistance >= distanceToTarget*0.7)
             {
                 m_Drone.Move(-controller.velocity.x * 100, -controller.velocity.z * 100);
-            }*/
+            }
             else
             {
                 Debug.DrawLine(transform.position, transform.position + direction, Color.yellow); //drawing the direction, and it is alwaise correct.
@@ -469,7 +471,16 @@ public class DroneAI : MonoBehaviour
         private float x, z;
         private int color;
         private int parent;
+        private float distanceToWall;
         
+        public float getDistanceToWall()
+        {
+            return distanceToWall;
+        }
+        public void setDistanceToWall(float _d)
+        {
+            distanceToWall = _d;
+        }
         public int getParent()
         {
             return parent;
@@ -701,9 +712,9 @@ public class DroneAI : MonoBehaviour
 
     public void RRG(int max_nodes,Graph G)
     {
-        float edgeLength = 3f;
+        float edgeLength = 4f;
         float nodeMinDistance = 1f;
-        float addEdgeMaxLength = 6.0f;
+        float addEdgeMaxLength = 9.0f;
         float radiusMargin = droneCollider.radius + 3.0f;
 
         int max_iter=10000;
@@ -954,7 +965,7 @@ public class DroneAI : MonoBehaviour
         }
         max_speed = 1 / (1 +  ((180 - best_angle)*alpha) * ((180 - best_angle) * alpha));
         //max_speed = 15;
-        real_cost = Vector3.Distance(G.getNode(parent).getPosition(), G.getNode(child).getPosition())/max_speed; /// max_speed;
+        real_cost = Vector3.Distance(G.getNode(parent).getPosition(), G.getNode(child).getPosition());//max_speed; /// max_speed;
 
 
         RaycastHit rayHit;
@@ -969,9 +980,44 @@ public class DroneAI : MonoBehaviour
         }
 
 
-        return 3*real_cost+h_cost;
+        return 3 * real_cost + h_cost; //+ (200f / G.getNode(child).getDistanceToWall());
 
     }
 
-    
+    public void computeDiStanceToWall(Graph G)
+    {
+        RaycastHit hit;
+        float radiusMargin = 1f;
+
+        List<Vector3> radiusHelpMatrix = new List<Vector3>();
+
+        radiusHelpMatrix.Add(new Vector3(-1f, -1f, -1f));
+        radiusHelpMatrix.Add(new Vector3(1f, 1f, 1f));
+        radiusHelpMatrix.Add(new Vector3(1f, 1f, -1f));
+        radiusHelpMatrix.Add(new Vector3(1f, -1f, 1f));
+        radiusHelpMatrix.Add(new Vector3(1f, -1f, -1f));
+        radiusHelpMatrix.Add(new Vector3(-1f, 1f, 1f));
+        radiusHelpMatrix.Add(new Vector3(-1f, 1f, -1f));
+        radiusHelpMatrix.Add(new Vector3(-1f, -1f, 1f));
+
+        for (int i =0;i < G.getSize(); i++)
+        {
+            float minDistance = 5000f;
+            float actualDistance; 
+            for (int j = 0; j < radiusHelpMatrix.Count; j++)
+            {
+                Physics.SphereCast(G.getNode(i).getPosition(),2, radiusHelpMatrix[j], out hit, 50f);
+                actualDistance=hit.distance;
+                if (actualDistance != 0)
+                {
+                    if (minDistance > actualDistance)
+                    {
+                        minDistance = actualDistance;
+                    }
+                }
+            }
+            G.getNode(i).setDistanceToWall(minDistance);
+            Debug.Log(minDistance);
+        }
+    }
 }

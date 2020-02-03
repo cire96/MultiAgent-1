@@ -15,7 +15,8 @@ namespace UnityStandardAssets.Vehicles.Car
         private CarController m_Car; // the car controller we want to use
         int counter=0;
         //SphereCollider droneCollider;
-        public float Margin=0;
+        private float Margin=0;
+        private float sideMargin=0;
 
         public GameObject terrain_manager_game_object;
         TerrainManager terrain_manager;
@@ -23,11 +24,13 @@ namespace UnityStandardAssets.Vehicles.Car
         //All edges have same length:
         public float edgeLength = 5.0f;
         public float edgeMinDist = 0.1f;
-        public float addEdgeMaxLength =  2.5f;
+        public float addEdgeMaxLength =  10.0f;
         List<Node> my_path = new List<Node>();
         int randomTimer = 0;
         Vector3 goal_pos;
         int lastPointInPath=0;
+        public float newAngle=0; 
+        private Boolean backing=false;
 
         private void Start()
         {   
@@ -39,7 +42,8 @@ namespace UnityStandardAssets.Vehicles.Car
 
             Transform ColliderBottom=m_Car.transform.Find("Colliders").Find("ColliderBottom");
             Vector3 scale = ColliderBottom.localScale;
-            Margin = scale.z;
+            Margin = scale.z/2;
+            sideMargin = scale.x/2;
             
 
             // Plan your path here
@@ -53,7 +57,7 @@ namespace UnityStandardAssets.Vehicles.Car
 
             DroneGraph = new Graph();
             DroneGraph.addNode(StartNode);
-            int n = 1000;
+            int n = 3000;
             RRG(n, DroneGraph);
             killFuckers(DroneGraph);
             for (int i=0; i< DroneGraph.getSize(); i++){
@@ -88,7 +92,7 @@ namespace UnityStandardAssets.Vehicles.Car
             Vector3 old_wp = start_pos;
             Debug.Log("Printing space now");
             foreach (var wp in path){
-                Debug.Log(Vector3.Distance(old_wp, DroneGraph.getNode(wp).getPosition()));
+                //Debug.Log(Vector3.Distance(old_wp, DroneGraph.getNode(wp).getPosition()));
                 Debug.DrawLine(old_wp, DroneGraph.getNode(wp).getPosition(), Color.red, 100f);
                 old_wp = DroneGraph.getNode(wp).getPosition();
             }
@@ -115,68 +119,90 @@ namespace UnityStandardAssets.Vehicles.Car
             // ...
 
             CarController controller=transform.GetComponent<CarController>();
+           
+            if(lastPointInPath==my_path.Count-3){
+                Vector3 carToTarget = transform.InverseTransformPoint(goal_pos);
+                float newSteer = (carToTarget.x / carToTarget.magnitude);
+                float newSpeed = 1f;
+                m_Car.Move(newSteer,newSpeed, newSpeed, 0);
 
-            if(lastPointInPath==my_path.Count-1){
-                //Vector3 way=Vector3.Lerp(new Vector3(0,0,0),goal_pos,1)-Vector3.Lerp(new Vector3(0,0,0),transform.position,1);
                 
             }else{
+                float curveAngel=Vector3.Angle(my_path[lastPointInPath].getPosition()-my_path[lastPointInPath+1].getPosition(),my_path[lastPointInPath+1].getPosition()-my_path[lastPointInPath+2].getPosition()); 
                 for(int i=lastPointInPath;i<my_path.Count;i=i+1){
-                    if (5.0f>=Vector3.Distance(my_path[i].getPosition(),transform.position)){
+                    if (2.0f+0.04*(controller.CurrentSpeed)>=Vector3.Distance(my_path[i].getPosition(),transform.position)){
                         lastPointInPath=i;
                     }
                 }
-            if(lastPointInPath!=my_path.Count-1){
-                
-                Vector3 target=my_path[lastPointInPath+1].getPosition();
-                float distanceToTargetTemp = Vector3.Distance(transform.position,target);
-                int targetId=0;
-                for(int i=lastPointInPath+2;i<my_path.Count;i=i+1){
-                    float newDistance=Vector3.Distance(transform.position,my_path[i].getPosition());
-                    if(distanceToTargetTemp>newDistance){
-                        distanceToTargetTemp=newDistance;
-                        target=my_path[i].getPosition();
-                        targetId=i;
+                if(lastPointInPath!=my_path.Count-1){
+                    
+                    Vector3 target=my_path[lastPointInPath+1].getPosition();
+                    float distanceToTargetTemp = Vector3.Distance(transform.position,target);
+                    int targetId=0;
+                    for(int i=lastPointInPath+2;i<my_path.Count;i=i+1){
+                        float newDistance=Vector3.Distance(transform.position,my_path[i].getPosition());
+                        if(distanceToTargetTemp>newDistance){
+                            distanceToTargetTemp=newDistance;
+                            target=my_path[i].getPosition();
+                            targetId=i;
+                        }
                     }
+                    Vector3 carToTarget = transform.InverseTransformPoint(target);
+                    float newSteer = (carToTarget.x / carToTarget.magnitude);
+                    float newSpeed = 1f;
+                    Vector3 steeringPoint = new Vector3(0,0,1);
+                    steeringPoint=(transform.rotation * steeringPoint);
+
+                    float breakingDistance = (controller.CurrentSpeed*controller.CurrentSpeed)/(2);
+                    float distanceToTarget = Vector3.Distance(transform.position,target);
+
+                    RaycastHit rayHit;
+                    bool hitBreak = Physics.SphereCast(transform.position,sideMargin, steeringPoint,out rayHit, 0.08f*breakingDistance);
+                    bool hitBack = Physics.SphereCast(transform.position,sideMargin, steeringPoint,out rayHit, Margin);
+                    bool hitContinueBack = Physics.SphereCast(transform.position,sideMargin, steeringPoint,out rayHit, Margin*3);
+                    newAngle=Vector3.Angle(transform.position-my_path[lastPointInPath+1].getPosition(),my_path[lastPointInPath+1].getPosition()-my_path[lastPointInPath+2].getPosition()); 
+                    if(controller.AccelInput==0 && backing==false){
+                        newSpeed = 1f/1+newAngle;
+                    }
+
+                    if(hitBack && backing==false){
+                        backing=true;
+                        newSpeed=-1f;
+                        if(controller.BrakeInput>0 && controller.AccelInput<=0){
+                            newSteer=-newSteer;
+                        }
+                    }else if(hitBreak){
+                        newSpeed=-1;
+                        print("yes");
+
+                    }
+                    if(hitContinueBack && controller.AccelInput>=0 && backing==false){
+                        newSteer= newSteer*2;
+                        //print("yes");
+                    }else if(controller.BrakeInput>0 && hitContinueBack && backing==true ){
+                        newSpeed=-1f;
+                        newSteer=-newSteer;
+                    }else{
+                        backing=false;
+                    }
+
+                    if(controller.CurrentSpeed>150){
+                        newSpeed=0;
+                    }
+                    m_Car.Move(newSteer,newSpeed, newSpeed, 0);
+                    
+                    
+                    
+
+                    //Debug.DrawLine(transform.position,my_path[lastPointInPath+1].getPosition(), Color.black);
+                    //Debug.DrawLine(my_path[lastPointInPath+1].getPosition(),my_path[lastPointInPath+2].getPosition(), Color.white);
+                    Debug.DrawLine(transform.position,target, Color.black);
+                    Debug.DrawLine(transform.position+steeringPoint*0.08f*breakingDistance,transform.position, Color.white);
+
                 }
-                Vector3 carToTarget = transform.InverseTransformPoint(target);
-                //Vector3 carToTarget= Vector3.Lerp(new Vector3(0,0,0),target,1)-Vector3.Lerp(new Vector3(0,0,0),transform.position,1);
-                //print(carToTarget/carToTarget.magnitude);
-                float newSteer = (carToTarget.x / carToTarget.magnitude);
-                float newSpeed = 0.5f;
-                float newBreak = 0f;
-                Vector3 steeringPoint = new Vector3(0,0,1);
-                steeringPoint=(transform.rotation * steeringPoint);
-
-                m_Car.Move(newSteer,newSpeed, newBreak, 0f);
-                float breakingDistance = (controller.CurrentSpeed*controller.CurrentSpeed)/(2*controller.AccelInput);
-                float distanceToTarget = Vector3.Distance(transform.position,target);
-
-                RaycastHit rayHit;
-
-                bool hit = Physics.SphereCast(transform.position,Margin, steeringPoint,out rayHit, breakingDistance+5.0f);
-                if(hit){
-                    //print(breakingDistance);
-                    newSpeed=0;
-                    newBreak=controller.CurrentSpeed*5.0f;
-                }
-                /*if(controller.CurrentSpeed>100){
-                    newSpeed=0;
-                }*/
-                m_Car.Move(newSteer,newSpeed, newBreak, 0);
-                
-                
-                
-
-                //Debug.DrawLine(transform.position,transform.position+controller.velocity, Color.red);
-                Debug.DrawLine(transform.position,target, Color.black);
-                Debug.DrawLine(transform.position+steeringPoint*controller.CurrentSpeed,transform.position, Color.white);
-
             }
-        }
-
             // this is how you control the car
             //m_Car.Move(0f, 0f, 0f, 0f);
-
         }
 
 
@@ -481,10 +507,11 @@ namespace UnityStandardAssets.Vehicles.Car
 
         public void RRG(int max_nodes,Graph G)
         {
-            float edgeLength = 5.0f;
-            float nodeMinDistance = 2.5f;
-            float addEdgeMaxLength = 10.0f;
-
+            //float edgeLength = 5.0f;
+            //float nodeMinDistance = 2.5f;
+            //float addEdgeMaxLength = 10.0f;
+            print(edgeLength);
+            print(addEdgeMaxLength);
 
             int max_iter=10000;
             Node close_node=null;
@@ -731,7 +758,7 @@ namespace UnityStandardAssets.Vehicles.Car
                     best_angle = actual_angle;
                 }
             }
-            max_speed = 1 / (1 +  ((180 - best_angle)*alpha) * ((180 - best_angle) * alpha));
+            max_speed = 1 / (1 +  ((180 - best_angle)*alpha) * ((180 - best_angle) * alpha)*((180 - best_angle)*alpha) * ((180 - best_angle) * alpha));
             //max_speed = 15;
             real_cost = Vector3.Distance(G.getNode(parent).getPosition(), G.getNode(child).getPosition())/max_speed; /// max_speed;
 

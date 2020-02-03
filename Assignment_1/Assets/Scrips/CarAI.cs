@@ -60,6 +60,7 @@ namespace UnityStandardAssets.Vehicles.Car
             int n = 3000;
             RRG(n, DroneGraph);
             killFuckers(DroneGraph);
+            computeDiStanceToWall(DroneGraph);
             for (int i=0; i< DroneGraph.getSize(); i++){
                     GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
                     Collider c = cube.GetComponent<Collider>();
@@ -73,7 +74,7 @@ namespace UnityStandardAssets.Vehicles.Car
                 cube.transform.position = new Vector3(position.x, 1, position.z);
                     cube.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
                     for (int j = 0; j < DroneGraph.getAdjList(i).Count; j++){
-                        Debug.DrawLine(DroneGraph.getNode(i).getPosition(), DroneGraph.getNode(DroneGraph.getAdjList(i)[j]).getPosition(), Color.blue, 100f);
+                        Debug.DrawLine(DroneGraph.getNode(i).getPosition(), DroneGraph.getNode(DroneGraph.getAdjList(i)[j]).getPosition(), Color.red, 100f);
                         //Debug.Log(DroneGraph.getNode(i).getPosition() +" - "+ DroneGraph.getNode(j).getPosition());
                 }
                 //Debug.Log("Adj list of node " + i.ToString());
@@ -93,7 +94,7 @@ namespace UnityStandardAssets.Vehicles.Car
             Debug.Log("Printing space now");
             foreach (var wp in path){
                 //Debug.Log(Vector3.Distance(old_wp, DroneGraph.getNode(wp).getPosition()));
-                Debug.DrawLine(old_wp, DroneGraph.getNode(wp).getPosition(), Color.red, 100f);
+                Debug.DrawLine(old_wp, DroneGraph.getNode(wp).getPosition(), Color.cyan, 100f);
                 old_wp = DroneGraph.getNode(wp).getPosition();
             }
 
@@ -150,6 +151,7 @@ namespace UnityStandardAssets.Vehicles.Car
                     Vector3 carToTarget = transform.InverseTransformPoint(target);
                     float newSteer = (carToTarget.x / carToTarget.magnitude);
                     float newSpeed = 1f;
+                    float handBreak = 0f;
                     Vector3 steeringPoint = new Vector3(0,0,1);
                     steeringPoint=(transform.rotation * steeringPoint);
 
@@ -173,17 +175,18 @@ namespace UnityStandardAssets.Vehicles.Car
                         }
                     }else if(hitBreak && backing==false){
                         newSpeed=-1;
-                        //print("yes");
+                        handBreak = 1;
+                        print("yes");
 
                     }
                     if(hitContinueBack && controller.AccelInput>=0 && backing==false){
                         newSteer= newSteer*2;
-                        print("nope");
+                        //print("nope");
                     } 
                     if(hitContinueBack && backing==true ){
                         newSpeed=-1f;
                         newSteer=-newSteer;
-                        print("yes");
+                        //print("yes");
                     }else{
                         backing=false;
                     }
@@ -191,7 +194,7 @@ namespace UnityStandardAssets.Vehicles.Car
                     if(controller.CurrentSpeed>150){
                         newSpeed=0;
                     }
-                    m_Car.Move(newSteer,newSpeed, newSpeed, 0);
+                    m_Car.Move(newSteer,newSpeed, newSpeed, handBreak);
                     
                     
                     
@@ -284,6 +287,16 @@ namespace UnityStandardAssets.Vehicles.Car
             private float x, z;
             private int color;
             private int parent;
+            private float distanceToWall;
+        
+            public float getDistanceToWall()
+            {
+                return distanceToWall;
+            }
+            public void setDistanceToWall(float _d)
+            {
+                distanceToWall = _d;
+            }
             
             public int getParent()
             {
@@ -777,8 +790,45 @@ namespace UnityStandardAssets.Vehicles.Car
             }
 
 
-            return 3*real_cost+h_cost;
+            return 3*real_cost+h_cost + (200f / G.getNode(child).getDistanceToWall());
 
+        }
+
+        public void computeDiStanceToWall(Graph G)
+        {
+            RaycastHit hit;
+            float radiusMargin = 1f;
+
+            List<Vector3> radiusHelpMatrix = new List<Vector3>();
+
+            radiusHelpMatrix.Add(new Vector3(-1f, -1f, -1f));
+            radiusHelpMatrix.Add(new Vector3(1f, 1f, 1f));
+            radiusHelpMatrix.Add(new Vector3(1f, 1f, -1f));
+            radiusHelpMatrix.Add(new Vector3(1f, -1f, 1f));
+            radiusHelpMatrix.Add(new Vector3(1f, -1f, -1f));
+            radiusHelpMatrix.Add(new Vector3(-1f, 1f, 1f));
+            radiusHelpMatrix.Add(new Vector3(-1f, 1f, -1f));
+            radiusHelpMatrix.Add(new Vector3(-1f, -1f, 1f));
+
+            for (int i =0;i < G.getSize(); i++)
+            {
+                float minDistance = 5000f;
+                float actualDistance; 
+                for (int j = 0; j < radiusHelpMatrix.Count; j++)
+                {
+                    Physics.SphereCast(G.getNode(i).getPosition(),2, radiusHelpMatrix[j], out hit, 50f);
+                    actualDistance=hit.distance;
+                    if (actualDistance != 0)
+                    {
+                        if (minDistance > actualDistance)
+                        {
+                            minDistance = actualDistance;
+                        }
+                    }
+                }
+                G.getNode(i).setDistanceToWall(minDistance);
+                Debug.Log(minDistance);
+            }
         }
 
 

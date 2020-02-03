@@ -130,7 +130,7 @@ namespace UnityStandardAssets.Vehicles.Car
             }else{
                 float curveAngel=Vector3.Angle(my_path[lastPointInPath].getPosition()-my_path[lastPointInPath+1].getPosition(),my_path[lastPointInPath+1].getPosition()-my_path[lastPointInPath+2].getPosition()); 
                 for(int i=lastPointInPath;i<my_path.Count;i=i+1){
-                    if (2.0f+0.04*(controller.CurrentSpeed)>=Vector3.Distance(my_path[i].getPosition(),transform.position)){
+                    if (3.0f+0.04*(controller.CurrentSpeed)>=Vector3.Distance(my_path[i].getPosition(),transform.position)){
                         lastPointInPath=i;
                     }
                 }
@@ -165,23 +165,25 @@ namespace UnityStandardAssets.Vehicles.Car
                         newSpeed = 1f/1+newAngle;
                     }
 
-                    if(hitBack && backing==false){
+                    if(hitBack){
                         backing=true;
                         newSpeed=-1f;
                         if(controller.BrakeInput>0 && controller.AccelInput<=0){
                             newSteer=-newSteer;
                         }
-                    }else if(hitBreak){
+                    }else if(hitBreak && backing==false){
                         newSpeed=-1;
-                        print("yes");
+                        //print("yes");
 
                     }
                     if(hitContinueBack && controller.AccelInput>=0 && backing==false){
                         newSteer= newSteer*2;
-                        //print("yes");
-                    }else if(controller.BrakeInput>0 && hitContinueBack && backing==true ){
+                        print("nope");
+                    } 
+                    if(hitContinueBack && backing==true ){
                         newSpeed=-1f;
                         newSteer=-newSteer;
+                        print("yes");
                     }else{
                         backing=false;
                     }

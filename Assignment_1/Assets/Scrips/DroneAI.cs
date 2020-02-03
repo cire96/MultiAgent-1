@@ -26,6 +26,7 @@ public class DroneAI : MonoBehaviour
     int randomTimer = 0;
     Vector3 goal_pos;
     int lastPointInPath=0;
+
     List<Node> my_path = new List<Node>();
     private void Start()
     {
@@ -98,51 +99,21 @@ public class DroneAI : MonoBehaviour
         }
 
 
+        
 
-
-        /*
-        foreach (var p in paths)
-        {
-            Color color = Color.white;
-            color.r = UnityEngine.Random.Range(0f, 1f);
-            color.g = UnityEngine.Random.Range(0f, 1f);
-            color.b = UnityEngine.Random.Range(0f, 1f);
-            Vector3 old_wp = start_pos;
-            foreach (var wp in p)
-            {
-
-
-                Debug.DrawLine(old_wp, DroneGraph.getNode(wp).getPosition(), color, 100f);
-                old_wp = DroneGraph.getNode(wp).getPosition();
-            }
-        }
-        */
-        //my_path.Add(start_pos);
-
-        //for (int i = 0; i < 200; i++)
-        // {
-        //   Vector3 waypoint = Pseudo_random(radiusMargin);
-        //my_path.Add(waypoint);
-
-
-        //}
-
-        //my_path.Add(goal_pos);
-
-
-
-        // Plot your path to see if it makes sense
-        //Vector3 old_wp = start_pos;
-        //foreach (var wp in my_path)
-        //{
-        //    Debug.DrawLine(old_wp, wp, Color.blue, 100f);
-        //    old_wp = wp;
-        //}
-        //
+        
 
         my_path = pathHelp(DroneGraph,path);
-
-
+        setPathTheta(my_path);
+        Debug.Log("Theta path:");
+        var strings="";
+        for (int i = 0; i < my_path.Count; i++)
+        {
+              strings=(strings +", " + my_path[i].getTheta().ToString());
+            
+        }
+        Debug.Log(strings);
+        Debug.Log("Done");
     }
 
     List<Node> pathHelp(Graph G,List<int> idList){
@@ -154,9 +125,170 @@ public class DroneAI : MonoBehaviour
     }
 
 
+    private void FixedUpdate()
+    {
+        int i;
+        float radiusMargin = droneCollider.radius + 5.9f;
+        DroneController controller = transform.GetComponent<DroneController>();
+        RaycastHit rayHit;
 
-    private void FixedUpdate(){   
+        /*for (; lastPointInPath < my_path.Count && !((bool)Physics.SphereCast(transform.position, radiusMargin, my_path[lastPointInPath].getPosition() - transform.position, out rayHit, Vector3.Distance(my_path[lastPointInPath].getPosition(), transform.position)))
+         ; lastPointInPath++); // increase to find the farest node
+
+        lastPointInPath--;
+        */
+        Vector3 target = my_path[lastPointInPath].getPosition();
+        
+        int targetId = 0;
+        float minDistance = 100;
+        float actualDistance = 100;
+
+
+            for (i = 0; i < my_path.Count(); i ++)
+            {
+                actualDistance = Vector3.Distance(my_path[i].getPosition(), transform.position);
+                if ( minDistance> actualDistance)
+                {
+                    lastPointInPath = i;
+                    minDistance = actualDistance;
+                }
+            }
+            Debug.Log("I am close to node " + lastPointInPath.ToString());
+
+        
+        if (lastPointInPath != my_path.Count() - 1)
+        {
+            target = my_path[lastPointInPath + 1].getPosition();
+            targetId = lastPointInPath + 1;
+            
+                        for (i = lastPointInPath + 1; i < my_path.Count(); i ++)
+                        {
+                            float newDistance = Vector3.Distance(transform.position, my_path[i].getPosition());
+                            float distanceToTargetTemp = Vector3.Distance(transform.position, target);
+                            if (distanceToTargetTemp > newDistance)
+                            {
+                                distanceToTargetTemp = newDistance;
+                                target = my_path[i].getPosition();
+                                targetId = i;
+                            }
+                        }
+           /* for (i=lastPointInPath+1; i < my_path.Count() ; i++)
+            {
+
+                var highdronePosition = transform.position;
+                var lowdronePosition = transform.position;
+                var dronePosition = transform.position;
+                var pointDirection = my_path[i].getPosition();
+                highdronePosition.y += 1.1f;
+                lowdronePosition.y -= 0.9f;
+                //pointDirection.y += 1;
+
+                Physics.SphereCast(dronePosition, droneCollider.radius, (pointDirection - dronePosition).normalized  , out rayHit, Vector3.Distance(pointDirection,dronePosition));
+                //bool hit2=Physics.CapsuleCast(highdronePosition, lowdronePosition, droneCollider.radius*2, pointDirection - highdronePosition, Vector3.Distance(highdronePosition, pointDirection));
+                Debug.DrawRay(transform.position, (my_path[i].getPosition() - transform.position), Color.cyan, 10f);
+                //if (rayHit.collider.gameObject.name == "Cube") { 
+               
+                if (rayHit.collider != null){
+                //if (Physics.Raycast(my_path[i].getPosition(),  my_path[i].getPosition()- transform.position, Vector3.Distance(my_path[i].getPosition(), transform.position))) { 
+                    break;
+
+                }
+            }
+            i--;
+
+            target = my_path[i].getPosition();
+            targetId = i;
+            */
+        }
+        else
+        {
+            target = my_path[lastPointInPath].getPosition();
+            targetId = lastPointInPath;
+        }
+           
+        
+        Debug.Log("Going to node n." + targetId.ToString());
+        float breakingDistance = (controller.velocity.magnitude * controller.velocity.magnitude) / (controller.max_acceleration);
+        float distanceToTarget = Vector3.Distance(transform.position, target);
+        Debug.Log("Distance to target: " + distanceToTarget.ToString());
+
+        Vector3 direction = target - transform.position; //Direction to target!
+        bool hit =Physics.SphereCast(transform.position, droneCollider.radius, controller.velocity, out rayHit, breakingDistance );
+        if (rayHit.collider!=null) //Slow down if we are going to hit something
+        {
+            Debug.Log("Breaking distance: " + breakingDistance.ToString());
+            Debug.Log("OMG OMG SLOW NOW");
+            m_Drone.Move(-controller.velocity.x*100, -controller.velocity.z*100);
+            Debug.DrawLine(transform.position, transform.position + controller.acceleration, Color.black);
+        }
+        
+        else
+        {
+            /*if ( breakingDistance >= distanceToTarget)
+            {
+                m_Drone.Move(-controller.velocity.x * 100, -controller.velocity.z * 100);
+            }*/
+            
+            if(targetId==my_path.Count-1 && breakingDistance >= distanceToTarget) {
+                m_Drone.Move(-controller.velocity.x * 100, -controller.velocity.z * 100);
+            }
+            else if (controller.velocity.magnitude > 3 && targetId < my_path.Count - 2 && (my_path[targetId].getTheta() < 120 || my_path[targetId+1].getTheta() < 120 || my_path[targetId+2].getTheta() < 120) && breakingDistance >= distanceToTarget)
+            {
+                m_Drone.Move(-controller.velocity.x * 100, -controller.velocity.z * 100);
+            } 
+           /* else if ((my_path[targetId].getTheta() < 140 || my_path[targetId + 1].getTheta() < 140) && breakingDistance >= distanceToTarget * 2)
+            {
+                m_Drone.Move(-controller.velocity.x * 100, -controller.velocity.z * 100);
+            }
+            else if((my_path[targetId].getTheta() < 120 || my_path[targetId + 1].getTheta() < 120) && breakingDistance >= distanceToTarget)
+            {
+                m_Drone.Move(-controller.velocity.x * 100, -controller.velocity.z * 100);
+            }*/
+            else
+            {
+                Debug.DrawLine(transform.position, transform.position + direction, Color.yellow); //drawing the direction, and it is alwaise correct.
+                                                                                                  //Add speed compensation
+                Debug.Log("Angle between speed and acc " + Vector3.Angle(direction, controller.velocity).ToString());
+                if (controller.velocity.magnitude > 0.5 && Vector3.Angle(direction, controller.velocity) > 1 && Vector3.Angle(direction, controller.velocity) < 50)
+                {
+                    Vector3 specularSpeed = -controller.velocity + 2 * Vector3.Dot(controller.velocity, direction.normalized) * direction.normalized;
+                    Debug.DrawLine(transform.position, transform.position + specularSpeed, Color.white);
+                    direction = direction.normalized + 3 * specularSpeed.normalized;
+                }
+                else if (controller.velocity.magnitude> 0.5 && Vector3.Angle(direction, controller.velocity) >= 50)
+                {
+                    Debug.Log("Wrong direction, fixing speed of magnitudo " + controller.velocity.magnitude);
+                    direction = -controller.velocity * 100;
+                    //m_Drone.Move(-controller.velocity.x * 100, -controller.velocity.z * 100);
+                }
+                //  m_Drone.Move  HERE YOU SHOULD DO ACCELLERATION IN THE DIRECTION OF THE POINT 
+                // IF SPEED.DIRECTION != ACCELLERATION. DIRECTION
+                // COMPENSATE THE SPEED COMPLEMENTING IT WITH SOME ACCELLERATION IN SPECULAR (NON OPPOSITE) DIRECTION.
+                Vector3 high = new Vector3(0, 1, 0);
+                Vector3 side1 = Vector3.Cross(direction, high).normalized;
+                Vector3 side2 = -side1;
+                bool hitside1=Physics.Raycast(transform.position, side1, 4);
+                bool hitside2=Physics.Raycast(transform.position, side2, 4);
+                if(hitside1 && !hitside2)
+                {
+                    direction = direction + side2;
+                }else if(hitside2 && !hitside1)
+                {
+                    direction = direction +  side1;
+                }
+
+                m_Drone.Move(direction.x, direction.z);
+            }
+        }
+
+        Debug.DrawLine(transform.position, transform.position + controller.velocity, Color.red);
+        Debug.DrawLine(transform.position, transform.position + controller.acceleration, Color.black);
+    }
+    private void FixedUpdate2(){   
         float radiusMargin = droneCollider.radius + 0.5f;
+
+
+
         DroneController controller=transform.GetComponent<DroneController>();
 
         // Execute your path here
@@ -201,7 +333,7 @@ public class DroneAI : MonoBehaviour
                 
 
 
-                float breakingDistance = (controller.velocity.magnitude*controller.velocity.magnitude)/(2*controller.acceleration.magnitude);
+                float breakingDistance = (controller.velocity.magnitude*controller.velocity.magnitude)/(controller.max_acceleration);
                 float distanceToTarget = Vector3.Distance(transform.position,target);
                 RaycastHit rayHit;
                 bool hit = Physics.SphereCast(transform.position,radiusMargin, controller.velocity,out rayHit, breakingDistance+5.0f);
@@ -324,7 +456,7 @@ public class DroneAI : MonoBehaviour
 
         //Debug.Log("x: "+cordx.ToString()+"| z: "+cordz.ToString());
 
-        return new Vector3(cordx, 0, cordz);
+        return new Vector3(cordx, 1, cordz);
 
     }
 
@@ -372,7 +504,7 @@ public class DroneAI : MonoBehaviour
         {
             x = _x;
             z = _z;
-            position = new Vector3(_x, 0, _z);
+            position = new Vector3(_x, 1, _z);
             id = -1;
         }
         public Node(Vector3 _position)
@@ -384,6 +516,7 @@ public class DroneAI : MonoBehaviour
         {
             x = 0;
             z = 0;
+
             id = -1;
         }
         public void setId(int _id)
@@ -503,25 +636,10 @@ public class DroneAI : MonoBehaviour
         }
 
 
-        public void setPathTheta(List<int> _path)
-        {
-            int A, B, C = 0;
-            A = _path[0];
-            nodes[A].setTheta(0);
-
-            for (int i = 1; i < _path.Count() - 1; i++)
-            {
-                A = _path[i - 1];
-                B = _path[i];
-                C = _path[i + 1];
-                nodes[B].setTheta(computeAngle(nodes[A], nodes[B], nodes[C]));
-            }
-            nodes[C].setTheta(0);
-
-        }
+       
         public double computePathCost(List<int> _path)
         {
-            setPathTheta(_path); //Compute the angles of the nodes of that path
+            //setPathTheta(_path); //Compute the angles of the nodes of that path
 
             double cost = 0;
             //Compute the max_speed that we can use to reach each node
@@ -553,6 +671,27 @@ public class DroneAI : MonoBehaviour
 
 
     }
+
+    public void setPathTheta(List<Node> _path)
+    {
+        Node A, B, C;
+        A = _path[0];
+        A.setTheta(0);
+
+        A = _path[0];
+        B = _path[1];
+        C = _path[2];
+
+        for (int i = 1; i < _path.Count() - 2; i++)
+        {
+            A = _path[i - 1];
+            B = _path[i];
+            C = _path[i + 1];
+            B.setTheta(computeAngle2(A, B, C));
+        }
+        C.setTheta(0);
+
+    }
     public float computeAngle2(Node _A, Node _B, Node _C)
     {
         Vector3 aa = _A.getPosition() - _B.getPosition();
@@ -562,9 +701,9 @@ public class DroneAI : MonoBehaviour
 
     public void RRG(int max_nodes,Graph G)
     {
-        float edgeLength = 5.0f;
-        float nodeMinDistance = 2.5f;
-        float addEdgeMaxLength = 10.0f;
+        float edgeLength = 3f;
+        float nodeMinDistance = 1f;
+        float addEdgeMaxLength = 6.0f;
         float radiusMargin = droneCollider.radius + 3.0f;
 
         int max_iter=10000;
@@ -679,7 +818,7 @@ public class DroneAI : MonoBehaviour
 
             for (j=0;j<adj.Count;j++)
             {
-                Debug.Log(Vector3.Distance(G.getNode(i).getPosition(), G.getNode(adj[j]).getPosition()));
+                //Debug.Log(Vector3.Distance(G.getNode(i).getPosition(), G.getNode(adj[j]).getPosition()));
 
                 if (Vector3.Distance(G.getNode(i).getPosition(), G.getNode(adj[j]).getPosition())> 10)
                 {
@@ -833,4 +972,6 @@ public class DroneAI : MonoBehaviour
         return 3*real_cost+h_cost;
 
     }
+
+    
 }
